@@ -1,0 +1,12 @@
+<?php
+namespace {{ namespace }};
+
+use vandarpay\OrchestrationSaga\Events\RpcCallBack;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class {{class}}CallBackEvent extends RpcCallBack
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+}

@@ -1,0 +1,16 @@
+<?php
+namespace {{ namespace }};
+
+
+use vandarpay\OrchestrationSaga\Rpc\Service;
+
+class {{class}}RpcService extends Service
+{
+    public function SyncActionA(string $input): mixed
+    {
+        return $this->setServiceName('test')
+            ->setCallBackEvent(CallbackEvent::class)
+            ->setRollBackEvent(RollbackEvent::class)
+            ->callSync('actionA', ['input' => $input]);
+    }
+}
