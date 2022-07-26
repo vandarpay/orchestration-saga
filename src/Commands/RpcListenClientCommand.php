@@ -5,6 +5,7 @@ namespace vandarpay\OrchestrationSaga\Commands;
 use Exception;
 use Illuminate\Console\Command;
 use vandarpay\OrchestrationSaga\Rpc\Client;
+use vandarpay\OrchestrationSaga\Rpc\Publisher;
 
 class RpcListenClientCommand extends Command
 {
@@ -39,6 +40,11 @@ class RpcListenClientCommand extends Command
      */
     public function handle(Client $rpcClient)
     {
+        $publisher = resolve(Publisher::class);
+        if (empty($publisher->getConnectedMicroservices())) {
+            $this->output->info('No publisher connection is defined to send requests to the destination server queue');
+            return;
+        }
         $message = 'Start listen to response queue from server ' . $rpcClient->getServerName();
         $this->output->info($message);
         $rpcClient->listen();

@@ -44,6 +44,10 @@ class RpcPublishClientCommand extends Command
         \Co\run(function () {
             $publisher = resolve(Publisher::class);
             $connectedMicroservices = $publisher->getConnectedMicroservices();
+            if (empty($connectedMicroservices)) {
+                $this->output->info('No publisher connection is defined to send requests to the destination server queue');
+                return;
+            }
             foreach ($connectedMicroservices as $microName => $callTypes) {
                 foreach ($callTypes as $callType) {
                     go(function () use ($microName, $callType) {
