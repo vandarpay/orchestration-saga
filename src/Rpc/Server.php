@@ -23,6 +23,7 @@ class Server extends Base
     {
         return parent::getServerName();
     }
+
     /**
      * @return void
      * @throws Exception
@@ -31,17 +32,23 @@ class Server extends Base
     {
         $this->channel->basic_qos(null, 0, false);
         $responseFunction = function ($req) {
+            $properties = $req->get_properties();
+            if (!$this->requiredParameterExist($properties)) {
+                $this->debug('required Parameter not exist in message');
+                $req->ack();
+                return;
+            }
             $process = new Process(function (Process $process) use ($req) {
                 $redisClient = $this->getRedisClient();
-                $correlationId = $req->get_properties()['correlation_id'];
-                $this->debug('Publish server request correlation_id :' . $correlationId . ' properties : ' . json_encode($req->get_properties()));
+                $properties = $req->get_properties();
+                $correlationId = $properties['correlation_id'];
+                $this->debug('Publish server request correlation_id :' . $correlationId . ' properties : ' . json_encode($properties));
                 $logDto = new RpcLogJobDto();
-                $logDto->setCorrelationId($req->get_properties()['correlation_id'])->setBody($req->body);
-                $requestBodyArray = [];
+                $logDto->setCorrelationId($properties['correlation_id'])->setBody($req->body);
+                $requestBodyArray = $serviceResponse = [];
                 try {
                     $this->storeLog($logDto->setStatus(RpcLogStatusEnum::PROCESSING));
-                    if (time() - $req->get('timestamp') > config('rpc.rabbitmq.request_timeout')) {
-                        $req->ack();
+                    if (time() - $req->get('timestamp') > config('rpc.request_timeout')) {
                         $this->storeLog($logDto->setStatus(RpcLogStatusEnum::EXPIRED));
                         $process->close();
                         $process->exit(0);
@@ -58,7 +65,7 @@ class Server extends Base
                     $this->storeLog($logDto->setStatus(RpcLogStatusEnum::PROCESSED)->setBody(json_encode($serviceResponse)));
                 } catch (Throwable $exception) {
                     $serviceResponse = $this->transformErrorResponse($exception);
-                    $logDto->setBody($req->body . ' /**/ ' . json_encode($exception));
+                    $logDto->setBody($req->body . ' ---- ' . json_encode($exception));
                     $this->storeLog($logDto->setStatus(RpcLogStatusEnum::SERVER_EXCEPTION));
                 }
                 $redisClient->publish($this->queuePendingResponseStack, json_encode([
@@ -76,7 +83,7 @@ class Server extends Base
                 $process->exit(0);
             });
             $pid = $process->start();
-            $this->debug('Process Start with pid (' . $pid . ') for correlation id : ' . $req->get_properties()['correlation_id']);
+            $this->debug('Process Start with pid (' . $pid . ') for correlation id : ' . $properties['correlation_id']);
             $req->ack();
         };
         $this->channel->basic_consume($this->queueRequest, '', false, false, false, false, $responseFunction);
@@ -85,6 +92,16 @@ class Server extends Base
         }
         $this->channel->close();
         $this->connection->close();
+    }
+
+    /**
+     * @param array $properties
+     * @return bool
+     */
+    private function requiredParameterExist(array $properties): bool
+    {
+        $requiredParameter = ['correlation_id', 'delivery_mode', 'priority', 'timestamp', 'app_id', 'reply_to'];
+        return count(array_intersect_key(array_flip($requiredParameter), $properties)) === count($requiredParameter);
     }
 
     /**
@@ -120,8 +137,8 @@ class Server extends Base
     private function makeServiceTransformer(array $data, ?string $version, string $serviceName, string $methodName): mixed
     {
         $serviceNamePascalCase = Str::studly($serviceName);
-        $serviceTransformerNamespace = $this->transformerNamespace . '\\' . $serviceNamePascalCase . '\\' ;
-        if(!is_null($version)){
+        $serviceTransformerNamespace = $this->transformerNamespace . '\\' . $serviceNamePascalCase . '\\';
+        if (!empty($version)) {
             $serviceTransformerNamespace .= $version . '\\';
         }
         $serviceTransformerNamespace .= $serviceNamePascalCase . 'Transformer';
@@ -177,10 +194,20 @@ class Server extends Base
         $dataArray = json_decode($request->getBody(), true);
         $responseArray = [];
         foreach (RpcRequestParameterEnum::cases() as $parameter) {
-            if (array_key_exists($parameter->value, $dataArray)) {
+            if (!is_null($dataArray) && array_key_exists($parameter->value, $dataArray)) {
                 $responseArray[$parameter->value] = $dataArray[$parameter->value];
             } else {
                 $responseArray[$parameter->value] = '';
+            }
+        }
+        $requiredData = [
+            RpcRequestParameterEnum::DATA->value => 'array',
+            RpcRequestParameterEnum::SERVICE_NAME->value => 'string',
+            RpcRequestParameterEnum::METHOD_NAME->value => 'string',
+        ];
+        foreach ($requiredData as $index => $type) {
+            if (gettype($responseArray[$index]) != $type || empty($responseArray[$index])) {
+                throw new Exception('Variable ' . $index . ' in json body must be of type ' . $type);
             }
         }
         return $responseArray;

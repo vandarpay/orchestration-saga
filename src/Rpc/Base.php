@@ -305,8 +305,9 @@ class Base
      */
     protected function debug(string $message)
     {
-        if (config('rpc.debug')) {
-            Log::channel('rpc')->debug($message);
+        $logChannel = config('rpc.debug_log_channel');
+        if (config('rpc.debug') && !empty($logChannel)) {
+            Log::channel($logChannel)->debug($message);
         }
     }
 

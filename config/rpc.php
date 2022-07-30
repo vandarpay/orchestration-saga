@@ -17,5 +17,6 @@ return [
     ],
     'request_timeout' => env('RPC_REQUEST_TIMEOUT', 30),
     'debug' => env('RPC_DEBUG', false),
+    'debug_log_channel' => env('RPC_DEBUG_LOG_CHANNEL'),
     'log_job' => env('LOG_JOB', '')
 ];
