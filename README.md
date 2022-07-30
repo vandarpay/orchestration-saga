@@ -18,7 +18,6 @@ you can easily implement communication between services using `Redis` and `Rabbi
 - Redis
 - PHP redis extension
 - PHP swoole extension
-- `composer require vandarpay/service-repository`
 
 ## Environments
 
@@ -34,6 +33,7 @@ Please add this environment variable to `.env` file
     RPC_USE_EXCHANGE_LOG=true
     RPC_REQUEST_TIMEOUT=30
     RPC_DEBUG=false 
+    RPC_DEBUG_LOG_CHANNEL=rpc 
     LOG_JOB=App/Jobs/RpcLogJob 
 
 - #### RPC_USE_EXCHANGE_LOG :
@@ -48,7 +48,28 @@ The duration of sending a request until receiving a response from another servic
 - #### RPC_DEBUG :
 
 By activating this parameter, all communication steps in your service will be saved in the log file. Use this feature
-only during development
+only during development.
+Also use the `RPC_DEBUG_LOG_CHANNEL` parameter to specify the log storage channel.
+Obviously, the channel introduced in the `RPC_DEBUG_LOG_CHANNEL` parameter must be defined in the `logging.php` file.
+
+- #### LOG_JOB :
+
+You can use this parameter to introduce a job to store all the states that occur for a request.
+The input of this job is of `RpcLogJobDto` type and the following statuses can be received in this job.
+
+- **init** : New request received
+- **sent**: The request was sent to the destination server
+- **received**: The request was received
+- **expired**: the desired request has expired
+- **before_transform**: before transforming the data to transfer to the destination server
+- **Processing**: The request is being processed
+- **processed**: The request was processed
+- **reply_request** : Sending reply
+- **answered**: The answer was sent
+- **response_received**: Response received
+- **server_exception**: An error occurred in the destination service
+- **client_exception**: A denial of service error occurred
+- **completed**: The answer has been completed
 
 ## Generator Commands
 
